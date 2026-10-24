@@ -86,8 +86,8 @@ under Contract DE-AC05-76RL01830
         <item>from dataclasses import dataclass, field</item>
         <item>from enum import Enum</item>
         <item>from typing import Optional</item>
-        <item>from cimgraph.data_profile.identity import Identity, stereotype</item>
-        <item>from cimgraph.data_profile.units import CIMUnit, UnitSymbol, UnitMultiplier</item>
+        <item>from cimprofiles.identity import Identity, stereotype</item>
+        <item>from cimprofiles.units import CIMUnit, UnitSymbol, UnitMultiplier</item>
         <item>_log = logging.getLogger(__name__)</item>
     </xsl:template>
     
@@ -102,7 +102,7 @@ under Contract DE-AC05-76RL01830
     
     <!-- Template for top-level classes with no inheritance.
          If the class is named 'Identity', skip emitting it (but still process its children)
-         because cimgraph imports its own Identity base class from cimgraph.data_profile.identity
+         because cimgraph imports its own Identity base class from cimprofiles.identity
          and a profile-defined Identity class would overwrite it. -->
     <xsl:template match="a:Root | a:ComplexType | a:CompoundType" mode="super">
         <xsl:choose>
@@ -124,13 +124,15 @@ under Contract DE-AC05-76RL01830
                 <!-- Process attributes -->
                 <xsl:apply-templates select="a:Simple" mode="simple_attribute"/>
                 <xsl:apply-templates select="a:Domain | a:Enumerated" mode="attribute"/>
+                <!-- Process inverse references first (they come from other classes).
+                     When a profile selects both ends of an association, the same field is
+                     also emitted below as this class's own reference (serialize=True).
+                     Python keeps the last definition, so the own reference must come last. -->
+                <xsl:apply-templates select="key('inverse_references', @name)" mode="inverse_association"/>
                 <xsl:apply-templates select="a:Instance | a:Reference" mode="association"/>
 
                 <!-- Add class metadata -->
                 <xsl:call-template name="generate-class-metadata"/>
-
-                <!-- Process inverse references first (they come from other classes) -->
-                <xsl:apply-templates select="key('inverse_references', @name)" mode="inverse_association"/>
 
                 <!-- Process child classes -->
                 <xsl:apply-templates select="key('classes_by_super', @name)" mode="lower"/>
@@ -144,7 +146,7 @@ under Contract DE-AC05-76RL01830
             <xsl:for-each select="key('classes_by_super', a:SuperType/@name)">
                 <xsl:call-template name="generate_stereotype"/>
                 
-                <item>@dataclass(repr=False)</item>
+                <item>@dataclass(repr=False, eq=False)</item>
                 
                 <xsl:variable name="class_name" select="local:sanitize_name(@name, @name)"/>
                 <item>class <xsl:value-of select="$class_name"/>(<xsl:value-of select="a:SuperType/@name"/>):</item>
@@ -154,10 +156,12 @@ under Contract DE-AC05-76RL01830
                 <!-- Process attributes -->
                 <xsl:apply-templates select="a:Simple" mode="simple_attribute"/>
                 <xsl:apply-templates select="a:Domain | a:Enumerated" mode="attribute"/>
-                <xsl:apply-templates select="a:Instance | a:Reference" mode="association"/>
-                
-                <!-- Process inverse references first (they come from other classes) -->
+                <!-- Process inverse references first (they come from other classes).
+                     When a profile selects both ends of an association, the same field is
+                     also emitted below as this class's own reference (serialize=True).
+                     Python keeps the last definition, so the own reference must come last. -->
                 <xsl:apply-templates select="key('inverse_references', @name)" mode="inverse_association"/>
+                <xsl:apply-templates select="a:Instance | a:Reference" mode="association"/>
                 
                 <!-- Add class metadata -->
                 <xsl:call-template name="generate-class-metadata"/>
@@ -350,7 +354,7 @@ under Contract DE-AC05-76RL01830
     <!-- Template for CIM Units as SimpleType -->
     <xsl:template match="a:SimpleType" mode="units">
         <xsl:call-template name="generate_stereotype"/>
-        <item>@dataclass(repr=False)</item>
+        <item>@dataclass(repr=False, eq=False)</item>
         <item>class <xsl:value-of select="@name"/>(CIMUnit):</item>
         
         <xsl:call-template name="generate_class_docstring"/>
