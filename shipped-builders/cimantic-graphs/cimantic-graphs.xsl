@@ -68,8 +68,10 @@ under Contract DE-AC05-76RL01830
             <!-- Process classes hierarchically, excluding Identity -->
             <xsl:apply-templates select="(a:Root | a:ComplexType)[not(a:SuperType)]" mode="super"/>
             
-            <!-- Process enumerations -->
-            <xsl:apply-templates select="a:EnumeratedType" mode="enumeration"/>
+            <!-- Process enumerations, excluding UnitSymbol and UnitMultiplier: they are
+                 imported from cimprofiles.units, and redefining them would shadow the
+                 enums the CIMUnit classes use -->
+            <xsl:apply-templates select="a:EnumeratedType[not(@name = 'UnitSymbol' or @name = 'UnitMultiplier')]" mode="enumeration"/>
             
             <!-- Process primitives -->
             <xsl:apply-templates select="a:SimpleType" mode="units"/>
@@ -363,7 +365,7 @@ under Contract DE-AC05-76RL01830
         <xsl:for-each select="a:Simple">
             <xsl:variable name="python_type" select="local:get_python_type(@xstype)"/>
             <list begin="" indent="    " end="">
-                <item><xsl:value-of select="@name"/>: <xsl:value-of select="$python_type"/> = field(default=None)</item>
+                <item><xsl:value-of select="@name"/>: <xsl:value-of select="$python_type"/> = field()</item>
             </list>
         </xsl:for-each>
         
@@ -390,7 +392,7 @@ under Contract DE-AC05-76RL01830
         <!-- Add __init__ method -->
         <xsl:variable name="unit-const" select="if (a:Enumerated[@name='unit']/@constant = '' or a:Enumerated[@name='unit']/@constant = 'none') then 'none' else a:Enumerated[@name='unit']/@constant"/>
         <list begin="" indent="    " end="">
-            <item>def __init__(self, value, input_unit: str='<xsl:value-of select="$unit-const"/>', input_multiplier: str=None):</item>
+            <item>def __init__(self, value, input_unit: str='<xsl:value-of select="$unit-const"/>', input_multiplier: Optional[str]=None):</item>
             <list begin="" indent="    " end="">
                 <item>self.__pint__(value=value, input_unit=input_unit, input_multiplier=input_multiplier)</item>
             </list>
