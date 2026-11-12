@@ -24,7 +24,7 @@
 	exclude-result-prefixes="a xalan" >
 
     <!-- Output the result as plain text -->
-    <xsl:output indent="no" method="text" encoding="utf-8"/>
+    <xsl:output indent="no" method="text" encoding="UTF-8"/>
     <xsl:param name="copyright-single-line" />
 	<xsl:param name="baseURI"/>
 	<xsl:param name="ontologyURI"/>
@@ -92,7 +92,7 @@
     	<xsl:apply-templates select="a:EnumeratedType" mode="gen-enums"/>
 	</xsl:template>
 
-    <xsl:template match="a:Root|a:ComplexType|CompoundType ">
+    <xsl:template match="a:Root|a:ComplexType|a:CompoundType">
         <item><xsl:text>  </xsl:text><xsl:value-of select="@name" />:</item>
         <xsl:text>&#10;</xsl:text>
         <xsl:variable name="description"><xsl:call-template name="linkml-description"/></xsl:variable>
@@ -110,11 +110,23 @@
 		<item><xsl:text>      ea_guid: </xsl:text>"<xsl:value-of select="@ea_guid" />"</item>
 		<xsl:text>&#10;</xsl:text>
 		<xsl:if test="a:SuperType">
-			<!-- The name of the superclass is determined using the @baseClass attribute (and not the a:SuperType/@name) -->
-		    <item><xsl:text>    is_a: </xsl:text><xsl:value-of select="substring-after(a:SuperType/@baseClass, '#')" /></item>
+			<!-- The name of the superclass is determined using the @baseClass attribute (and not the a:SuperType/@name).
+			     A class normally has one parent. It has more when shadow and mix-in extensions were not merged on
+			     import, in which case is_a names the first parent that is not a shadow extension and any others
+			     are listed as mixins. -->
+			<xsl:variable name="parents" select="(a:SuperType[@baseClassIsShadowExtension != 'true'], a:SuperType[@baseClassIsShadowExtension = 'true'])"/>
+		    <item><xsl:text>    is_a: </xsl:text><xsl:value-of select="substring-after($parents[1]/@baseClass, '#')" /></item>
 		    <xsl:text>&#10;</xsl:text>
+			<xsl:if test="count($parents) &gt; 1">
+				<item><xsl:text>    mixins:</xsl:text></item>
+				<xsl:text>&#10;</xsl:text>
+				<xsl:for-each select="subsequence($parents, 2)">
+					<item><xsl:text>      - </xsl:text><xsl:value-of select="substring-after(@baseClass, '#')" /></item>
+					<xsl:text>&#10;</xsl:text>
+				</xsl:for-each>
+			</xsl:if>
 		</xsl:if>
-        <xsl:if test="not(a:Stereotype[contains(., '#concrete')])">
+        <xsl:if test="not(a:Stereotype[contains(., '#concrete') or contains(., '#compound')])">
 			<xsl:text>    abstract: true</xsl:text>
 			<xsl:text>&#10;</xsl:text>
         </xsl:if>
@@ -177,7 +189,7 @@
 		</xsl:if>
 		<xsl:variable name="comments"><xsl:call-template name="linkml-comments"/></xsl:variable>
 		<xsl:if test="$comments != ''">
-			<item><xsl:text>    comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
+			<item><xsl:text>        comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
 			<xsl:text>&#10;</xsl:text>
 		</xsl:if>
 		<xsl:text>        annotations:</xsl:text>
@@ -218,7 +230,7 @@
 		</xsl:if>
 		<xsl:variable name="comments"><xsl:call-template name="linkml-comments"/></xsl:variable>
 		<xsl:if test="$comments != ''">
-			<xsl:text>    comments: </xsl:text>"<xsl:value-of select="$comments" />"
+			<item><xsl:text>        comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
 			<xsl:text>&#10;</xsl:text>
 		</xsl:if>
 		<xsl:text>        annotations:</xsl:text>
@@ -243,7 +255,7 @@
 		</xsl:choose>
     </xsl:template>
 
-    <xsl:template match="a:Reference|a:Instance">
+    <xsl:template match="a:Reference|a:Instance|a:Compound">
         <item><xsl:text>      </xsl:text><xsl:value-of select="@name" />:</item>
         <xsl:text>&#10;</xsl:text>
         <xsl:variable name="description"><xsl:call-template name="linkml-description"/></xsl:variable>
@@ -253,7 +265,7 @@
 		</xsl:if>
 		<xsl:variable name="comments"><xsl:call-template name="linkml-comments"/></xsl:variable>
 		<xsl:if test="$comments != ''">
-			<item><xsl:text>    comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
+			<item><xsl:text>        comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
 			<xsl:text>&#10;</xsl:text>
 		</xsl:if>
 		<xsl:text>        annotations:</xsl:text>
@@ -314,7 +326,7 @@
 		</xsl:if>
 		<xsl:variable name="comments"><xsl:call-template name="linkml-comments"/></xsl:variable>
 		<xsl:if test="$comments != ''">
-			<item><xsl:text>    comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
+			<item><xsl:text>        comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
 			<xsl:text>&#10;</xsl:text>
 		</xsl:if>
 		<xsl:text>        annotations:</xsl:text>
@@ -384,7 +396,7 @@
 		</xsl:if>
 		<xsl:variable name="comments"><xsl:call-template name="linkml-comments"/></xsl:variable>
 		<xsl:if test="$comments != ''">
-			<item><xsl:text>    comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
+			<item><xsl:text>        comments: </xsl:text>"<xsl:value-of select="$comments" />"</item>
 			<xsl:text>&#10;</xsl:text>
 		</xsl:if>
 		<item><xsl:text>        slot_uri: </xsl:text><xsl:call-template name="prefix"><xsl:with-param name="uri" select="@baseProperty"/></xsl:call-template></item>

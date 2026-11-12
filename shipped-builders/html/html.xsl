@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Copyright 2022 UCAIug
+  Copyright 2024 UCAIug
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 	<xsl:output indent="yes" doctype-public="-//W3C//DTD XHTML 1.1//EN" doctype-system="http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd" />
 	<xsl:param name="version"></xsl:param>
 	<xsl:param name="baseURI"></xsl:param>
+	<xsl:param name="copyright-single-line"></xsl:param>
 
 	<xsl:template match="a:Catalog">
 		<!--  the top level template generates the html and body elementa -->
@@ -122,6 +123,15 @@ p.package { position: absolute; right: 10px; top: 0px}
 				<xsl:apply-templates select="a:SimpleType" >
 					<xsl:sort select="@name"/>
 				</xsl:apply-templates>
+				<h1>Primitive Types</h1>
+				<xsl:apply-templates select="a:PrimitiveType" >
+					<xsl:sort select="@name"/>
+				</xsl:apply-templates>
+				<xsl:if test="$copyright-single-line and $copyright-single-line != ''">
+					<div class="footer" style="margin-top: 20px; padding-top: 8px; border-top: 1px solid gray; color: gray; font-size: small;">
+						<xsl:value-of select="$copyright-single-line"/>
+					</div>
+				</xsl:if>
 			</body>
 		</html>
 	</xsl:template>
@@ -149,10 +159,10 @@ p.package { position: absolute; right: 10px; top: 0px}
 	    <!-- generates the body of a class -->
         <p class="package"><xsl:value-of select="@package"/></p>
         <xsl:apply-templates mode="annotate" />
-        <xsl:if test="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated">
+        <xsl:if test="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated|a:Compound|a:Choice">
 	        <h3>Native Members</h3>
 	        <table>
-				<xsl:apply-templates select="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated" />
+				<xsl:apply-templates select="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated|a:Compound|a:Choice" />
 			</table>
 		</xsl:if>
 		<xsl:if test="a:SuperType">
@@ -161,12 +171,28 @@ p.package { position: absolute; right: 10px; top: 0px}
         </xsl:if>	
 	</xsl:template>
 
-	<xsl:template match="a:Instance|a:Reference|a:Enumerated|a:Domain">
+	<xsl:template match="a:Instance|a:Reference|a:Enumerated|a:Compound|a:Domain">
 		<!--  generates a property -->
 		<tr>
 	        <th><p class="name" id="{../@name}.{@name}"><xsl:value-of select="@name"/></p></th>
 	        <td><p class="cardinality"><xsl:value-of select="@minOccurs"/>..<xsl:choose><xsl:when test="@maxOccurs = 'unbounded'"><item>*</item></xsl:when><xsl:otherwise><xsl:value-of select="@maxOccurs"/></xsl:otherwise></xsl:choose></p></td>
 	        <td class="type"><p class="type"><a href="#{@type}"><xsl:value-of select="@type"/></a></p></td>
+	        <td> <xsl:apply-templates mode="annotate" /> </td>
+        </tr>
+	</xsl:template>
+	
+	<xsl:template match="a:Choice">
+		<!--  generates a Choice -->
+		<tr>
+	        <th><p class="name" id="{../@name}.{@name}"><xsl:value-of select="@name"/></p></th>
+	        <td><p class="cardinality"><xsl:value-of select="@minOccurs"/>..<xsl:choose><xsl:when test="@maxOccurs = 'unbounded'"><item>*</item></xsl:when><xsl:otherwise><xsl:value-of select="@maxOccurs"/></xsl:otherwise></xsl:choose></p></td>
+	        <td class="type">
+				<xsl:if test="count(a:Instance|a:Reference) > 0">Choices: <br/>
+					<xsl:for-each select="a:Instance|a:Reference">
+						<p class="type"><a href="#{@type}"><xsl:value-of select="@type"/></a></p><xsl:if test="position()!=last()"> or <br/></xsl:if>
+					</xsl:for-each>
+				</xsl:if>
+	        </td>
 	        <td> <xsl:apply-templates mode="annotate" /> </td>
         </tr>
 	</xsl:template>
@@ -176,7 +202,7 @@ p.package { position: absolute; right: 10px; top: 0px}
         <tr>
 	        <th><p class="name" id="{../@name}.{@name}"><xsl:value-of select="@name"/></p></th>
 	        <td><p class="cardinality"><xsl:value-of select="@minOccurs"/>..<xsl:value-of select="@maxOccurs"/></p></td>
-	        <td class="type"><p class="type"><xsl:value-of select="@xstype"/></p></td>
+	        <td class="type"><p class="type"><a href="#{substring-after(@cimDatatype, '#')}"><xsl:value-of select="substring-after(@cimDatatype, '#')"/></a></p></td>
 	        <td> <xsl:apply-templates mode="annotate" /> </td>
         </tr>
 	</xsl:template>
@@ -188,12 +214,12 @@ p.package { position: absolute; right: 10px; top: 0px}
 	
 	<xsl:template match="a:ComplexType|a:Root" mode="inherited">
 		<table>
-		  <xsl:apply-templates select="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated" mode="inherited"/>
+		  <xsl:apply-templates select="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated|a:Compound" mode="inherited"/>
 		</table>
         <xsl:apply-templates select="a:SuperType" mode="inherited"/>
 	</xsl:template>
 
-	<xsl:template match="a:Instance|a:Reference|a:Enumerated|a:Domain" mode="inherited">
+	<xsl:template match="a:Instance|a:Reference|a:Enumerated|a:Compound|a:Domain" mode="inherited">
 		<!--  generates an inherited property -->
 		<tr>
 	        <th><p class="name"><xsl:value-of select="@name"/></p></th>
@@ -202,13 +228,29 @@ p.package { position: absolute; right: 10px; top: 0px}
 	        <td><p>see <a class="superclass" href="#{../@name}.{@name}"><xsl:value-of select="../@name"/></a></p></td>
         </tr>
 	</xsl:template>
+	
+	<xsl:template match="a:Choice" mode="inherited">
+		<!--  generates a Choice -->
+		<tr>
+	        <th><p class="name" id="{../@name}.{@name}"><xsl:value-of select="@name"/></p></th>
+	        <td><p class="cardinality"><xsl:value-of select="@minOccurs"/>..<xsl:choose><xsl:when test="@maxOccurs = 'unbounded'"><item>*</item></xsl:when><xsl:otherwise><xsl:value-of select="@maxOccurs"/></xsl:otherwise></xsl:choose></p></td>
+	        <td class="type">
+				<xsl:if test="count(a:Instance|a:Reference) > 0">Choices: <br/>
+					<xsl:for-each select="a:Instance|a:Reference">
+						<p class="type"><a href="#{@type}"><xsl:value-of select="@type"/></a></p><xsl:if test="position()!=last()"> or <br/></xsl:if>
+					</xsl:for-each>
+				</xsl:if>
+	        </td>
+	        <td> <xsl:apply-templates mode="annotate" /> </td>
+        </tr>
+	</xsl:template>
 
 	<xsl:template match="a:Simple"  mode="inherited">
         <!--  generates an inherited attribute with an xsd part 2 simple type -->
         <tr>
 	        <th><p class="name" ><xsl:value-of select="@name"/></p></th>
 	        <td><p class="cardinality"><xsl:value-of select="@minOccurs"/>..<xsl:value-of select="@maxOccurs"/></p></td>
-	        <td class="type"><p class="type"><xsl:value-of select="@xstype"/></p></td>
+	        <td class="type"><p class="type"><a href="#{substring-after(@cimDatatype, '#')}"><xsl:value-of select="substring-after(@cimDatatype, '#')"/></a></p></td>
 	        <td><p>see <a  class="superclass" href="#{../@name}.{@name}"><xsl:value-of select="../@name"/></a></p></td>
         </tr>
 	</xsl:template>
@@ -231,13 +273,25 @@ p.package { position: absolute; right: 10px; top: 0px}
         <xsl:apply-templates mode="annotate" />
         <h3>Members</h3>
 	    <table>
-		  <xsl:apply-templates select="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated" />
+		  <xsl:apply-templates select="a:Domain|a:Simple|a:Instance|a:Reference|a:Enumerated|a:Compound" />
 		</table>
       </div>
     </xsl:template>
 
 	<xsl:template match="a:SimpleType">
 		<!--  declares a a CIM domain type in terms of an xsd part 2 simple type -->
+		<div id="{@name}" class="group">
+        <a href="#{@name}">
+        <h2 class="domain"><xsl:value-of select="@name"/></h2>
+        </a>
+        <p class="package"><xsl:value-of select="@package"/></p>
+        <xsl:apply-templates mode="annotate" />
+        <p class="declaration">XSD type: <span class="xsdtype"><xsl:value-of select="@xstype"/></span></p>
+        </div>
+	</xsl:template>
+	
+	<xsl:template match="a:PrimitiveType">
+		<!--  declares a a CIM primitive type in terms of an xsd part 2 simple type -->
 		<div id="{@name}" class="group">
         <a href="#{@name}">
         <h2 class="domain"><xsl:value-of select="@name"/></h2>
